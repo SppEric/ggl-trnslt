@@ -1,3 +1,18 @@
+# useful links
+
+https://pypi.org/project/pytesseract/
+https://www.kaggle.com/code/dhorvay/pytesseract-orientation-script-detection-osd
+https://gist.github.com/omairaasim/ac4d23f511644ad8a6ed1b2f58b79130
+
+useful functions:
+image_to_boxes - > returns the individual characters and the coordinates of their location box
+image_to_osd -> returns orientation, rotation, and script/font
+image_to_string -> returns the string of text
+
+
+
+
+
 # Final Project Report Template
 This directory contains the files for your team to complete the Final Project Report.
 
