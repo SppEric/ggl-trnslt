@@ -4,6 +4,9 @@ import pytesseract
 from translation import translate_text
 
 def get_bounding_box(image):
+    """Uses pytesseract to get bounding box coordinates for words in an image
+    returns: a list of 4-tuples, one for each word, with the 
+    top left x and y coords, the width, and the height of the bounding box"""
     # Use pytesseract to get bounding box and text data
     boxes = pytesseract.image_to_data(image)
 
@@ -30,10 +33,13 @@ def get_bounding_box(image):
     return return_pts
 
 def get_text(image):
+    """Uses pytesseract to get the text of an image"""
     words = pytesseract.image_to_string(image)
     return words
 
 def image_processing(image_path: str):
+    """takes in an image path and returns the bounding boxes of all words in the image,
+    as well as the text contained in the image"""
     # Load the image
     image = cv2.imread(image_path)
     # Convert image to RGB (OpenCV loads images in BGR)
@@ -43,6 +49,8 @@ def image_processing(image_path: str):
     text = get_text(image)
 
     return image, text, bounding_pts
+
+
 
 image, text, bounding_pts = image_processing("code/example_text.jpg")
 print(bounding_pts)
