@@ -103,6 +103,9 @@ def get_text(image):
     words = pytesseract.image_to_string(image)
     return words
 
+def cluster_boxes(boxes: list):
+    
+
 def image_processing(image_path: str):
     """takes in an image path and returns the bounding boxes of all words in the image,
     as well as the text contained in the image"""
@@ -112,18 +115,19 @@ def image_processing(image_path: str):
     # TODO: cut this out if we don't need it
     # rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    unskewed_image, skew_num = unskew_image(image)
-    bounding_pts = get_bounding_box(unskewed_image)
-    text = get_text(unskewed_image)
+    # unskewed_image, skew_num = unskew_image(image)
+    text = get_text(image)
+    bounding_pts = get_bounding_box(image)
+    # text = get_text(image)
     
 
-    return image, text, bounding_pts, skew_num
+    return image, text, bounding_pts#, skew_num
 
 
 
-# image, text, bounding_pts, skew_num = image_processing("code/example_text.jpg")
-# image, text, bounding_pts, skew_num = image_processing("code/skew.png")
-image, text, bounding_pts, skew_num = image_processing("code/PbjyR.png")
+image, text, bounding_pts = image_processing("code/example_text.jpg")
+# image, text, bounding_pts = image_processing("code/skew.png")
+# image, text, bounding_pts, skew_num = image_processing("code/PbjyR.png")
 
 
 print(bounding_pts)
