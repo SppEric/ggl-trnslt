@@ -9,6 +9,7 @@ from collections import defaultdict
 from translation import translate_text
 
 
+# TODO: either use or delete
 def unskew_image(image):
     """Uses pytesseract to detect the skew of the text in an image
     and return the skew of the original image and a 'corrected' image
@@ -106,8 +107,10 @@ def get_text(image):
     words = pytesseract.image_to_string(image)
     return words
 
-def cluster_boxes(boxes: list):
 
+def cluster_boxes(boxes: list):
+    """Cluster the text regions based on distance, in order to get discrete
+    text boxes to translate more effectively"""
     N = len(boxes)
     dists = np.zeros((N, N))
     for i in range(N):
@@ -115,7 +118,7 @@ def cluster_boxes(boxes: list):
             dists[i, j] = rect_distance(boxes[i], boxes[j])
 
     # Cluster with DBSCAN
-    clustering = DBSCAN(eps=50, min_samples=1, metric='precomputed')
+    clustering = DBSCAN(eps=30, min_samples=1, metric='precomputed')
     labels = clustering.fit_predict(dists)
     
     clusters = defaultdict(list)
@@ -131,12 +134,11 @@ def cluster_boxes(boxes: list):
         x_max, y_max = max(xws), max(yhs)
         return (x_min, y_min, x_max - x_min, y_max - y_min)
 
-    merged_rects = [merge_rects(rlist) for rlist in clusters.values()]
-    return merge_rects
-    pass
+    merged= [merge_rects(rlist) for rlist in clusters.values()]
+    return merged
 
-#this calculates the distance between boxes
 def rect_distance(r1, r2):
+    """Calculates distance between boxes"""
     x1, y1, w1, h1 = r1
     x2, y2, w2, h2 = r2
 
@@ -167,22 +169,22 @@ def image_processing(image_path: str):
     bounding_pts = get_bounding_box(image)
     # text = get_text(image)
     
-
     return image, text, bounding_pts#, skew_num
 
 
-
+# Plot the clustered boundaries
 image, text, bounding_pts = image_processing("code/example_text.jpg")
-merged_rects = cluster_boxes(bounding_pts)
+merged = cluster_boxes(bounding_pts)
 
 fig, ax = plt.subplots()
+
 
 # Original rectangles in blue
 for x, y, w, h in bounding_pts:
     ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='blue', facecolor='none', linewidth=1, linestyle='--'))
 
 # Merged rectangles in red
-for x, y, w, h in merged_rects:
+for x, y, w, h in merged:
     ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='red', facecolor='none', linewidth=2))
 
 plt.gca().invert_yaxis()  # Flip Y axis to match typical top-left origin
