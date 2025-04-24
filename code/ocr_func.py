@@ -104,7 +104,8 @@ def get_text(image):
     return words
 
 def cluster_boxes(boxes: list):
-    
+    pass
+
 
 def image_processing(image_path: str):
     """takes in an image path and returns the bounding boxes of all words in the image,
