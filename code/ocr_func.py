@@ -2,6 +2,9 @@ import cv2
 import pytesseract
 import numpy as np
 import matplotlib.pyplot as plt # Matplotlib library for plotting
+import matplotlib.patches as patches
+from sklearn.cluster import DBSCAN
+from collections import defaultdict
 
 from translation import translate_text
 
@@ -104,7 +107,50 @@ def get_text(image):
     return words
 
 def cluster_boxes(boxes: list):
+
+    N = len(boxes)
+    dists = np.zeros((N, N))
+    for i in range(N):
+        for j in range(N):
+            dists[i, j] = rect_distance(boxes[i], boxes[j])
+
+    # Cluster with DBSCAN
+    clustering = DBSCAN(eps=50, min_samples=1, metric='precomputed')
+    labels = clustering.fit_predict(dists)
+    
+    clusters = defaultdict(list)
+    for rect, label in zip(boxes, labels):
+        clusters[label].append(rect)
+
+    def merge_rects(rect_list):
+        xs = [x for x, y, w, h in rect_list]
+        ys = [y for x, y, w, h in rect_list]
+        xws = [x + w for x, y, w, h in rect_list]
+        yhs = [y + h for x, y, w, h in rect_list]
+        x_min, y_min = min(xs), min(ys)
+        x_max, y_max = max(xws), max(yhs)
+        return (x_min, y_min, x_max - x_min, y_max - y_min)
+
+    merged_rects = [merge_rects(rlist) for rlist in clusters.values()]
+    return merge_rects
     pass
+
+#this calculates the distance between boxes
+def rect_distance(r1, r2):
+    x1, y1, w1, h1 = r1
+    x2, y2, w2, h2 = r2
+
+    left = max(x1, x2)
+    right = min(x1 + w1, x2 + w2)
+    top = max(y1, y2)
+    bottom = min(y1 + h1, y2 + h2)
+
+    if right > left and bottom > top:
+        return 0  # Overlapping
+
+    dx = max(x2 - (x1 + w1), x1 - (x2 + w2), 0)
+    dy = max(y2 - (y1 + h1), y1 - (y2 + h2), 0)
+    return (dx**2 + dy**2)**0.5
 
 
 def image_processing(image_path: str):
@@ -127,6 +173,22 @@ def image_processing(image_path: str):
 
 
 image, text, bounding_pts = image_processing("code/example_text.jpg")
+merged_rects = cluster_boxes(bounding_pts)
+
+fig, ax = plt.subplots()
+
+# Original rectangles in blue
+for x, y, w, h in bounding_pts:
+    ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='blue', facecolor='none', linewidth=1, linestyle='--'))
+
+# Merged rectangles in red
+for x, y, w, h in merged_rects:
+    ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='red', facecolor='none', linewidth=2))
+
+plt.gca().invert_yaxis()  # Flip Y axis to match typical top-left origin
+plt.axis('equal')
+plt.title("Blue = Original Rectangles, Red = Merged Clusters")
+plt.show()
 # image, text, bounding_pts = image_processing("code/skew.png")
 # image, text, bounding_pts, skew_num = image_processing("code/PbjyR.png")
 
