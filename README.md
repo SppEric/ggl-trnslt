@@ -5,6 +5,7 @@ Packages to pip install
 - translate
 - opencv-python
 - pytesseract
+- scikit-learn
 
 
 ## TODO:
