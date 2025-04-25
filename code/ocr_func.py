@@ -8,6 +8,8 @@ from collections import defaultdict
 
 from translation import translate_text
 
+# Variable to generate graphs of the bounding boxes for debugging
+DEBUGGING = True
 
 # TODO: either use or delete
 def unskew_image(image):
@@ -94,11 +96,11 @@ def get_bounding_box(image):
             return_pts.append((x, y, w, h))
     # TODO: Use the below lines to visually show bounding boxes - messes with translation so don't use for real
             # create a bounding box rectangle to show the text - don't need this
-            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-    # Show the result
-    cv2.imshow('Image with Bounding Boxes', image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    #         cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+    # # Show the result
+    # cv2.imshow('Image with Bounding Boxes', image)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
     return return_pts
 
@@ -134,7 +136,7 @@ def cluster_boxes(boxes: list):
         x_max, y_max = max(xws), max(yhs)
         return (x_min, y_min, x_max - x_min, y_max - y_min)
 
-    merged= [merge_rects(rlist) for rlist in clusters.values()]
+    merged = [merge_rects(rlist) for rlist in clusters.values()]
     return merged
 
 def rect_distance(r1, r2):
@@ -165,38 +167,58 @@ def image_processing(image_path: str):
     # rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     # unskewed_image, skew_num = unskew_image(image)
-    text = get_text(image)
-    bounding_pts = get_bounding_box(image)
     # text = get_text(image)
+    # get the bounding boxes
+    bounding_pts = get_bounding_box(image)
+    # cluster the bounding boxes
+    cluster_rectangles = cluster_boxes(bounding_pts)
+
+    text_list = []
+    for ex in cluster_rectangles:
+        # crop the image around the boxes and get the text from that image
+        x, y, w, h = ex
+        cropped_image = image[y:y+h, x:x+w]
+        text = get_text(cropped_image)
+        text = str.replace(text, "\n", " ")
+        print(text)
+        text_list.append(text)
+
     
-    return image, text, bounding_pts#, skew_num
+    return image, text_list, bounding_pts, cluster_rectangles #, skew_num
 
 
-# Plot the clustered boundaries
-image, text, bounding_pts = image_processing("code/example_text.jpg")
-merged = cluster_boxes(bounding_pts)
+def ocr_function(filepath: str):
+    """Runs the functionality of the file, taking in an input filepath,
+    running OCR on it, and returning the text and bounding boxes of the image"""
+    # Plot the clustered boundaries
+    image, text, bounding_boxes, cluster_rectangles = image_processing(filepath)
+    # image, text, bounding_pts = image_processing("code/skew.png")
+    # image, text, bounding_pts, skew_num = image_processing("code/PbjyR.png")
+    
 
-fig, ax = plt.subplots()
-
-
-# Original rectangles in blue
-for x, y, w, h in bounding_pts:
-    ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='blue', facecolor='none', linewidth=1, linestyle='--'))
-
-# Merged rectangles in red
-for x, y, w, h in merged:
-    ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='red', facecolor='none', linewidth=2))
-
-plt.gca().invert_yaxis()  # Flip Y axis to match typical top-left origin
-plt.axis('equal')
-plt.title("Blue = Original Rectangles, Red = Merged Clusters")
-plt.show()
-# image, text, bounding_pts = image_processing("code/skew.png")
-# image, text, bounding_pts, skew_num = image_processing("code/PbjyR.png")
+    if DEBUGGING:
+        fig, ax = plt.subplots()
+        ax.imshow(image)
 
 
-print(bounding_pts)
-print(text)
+        # Original rectangles in blue
+        for x, y, w, h in bounding_boxes:
+            ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='blue', facecolor='none', linewidth=1, linestyle='--'))
 
-print(translate_text(text, "en", "fr"))
+        # Merged rectangles in red
+        for x, y, w, h in cluster_rectangles:
+            ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='red', facecolor='none', linewidth=2))
+        
+        # plt.gca().invert_yaxis()  # Flip Y axis to match typical top-left origin
+        plt.axis('equal')
+        plt.title("Blue = Original Rectangles, Red = Merged Clusters")
+        plt.show()
 
+
+        print(bounding_boxes)
+        # print(text)
+
+        # print(translate_text(text, "en", "fr"))
+
+    # return a list of clusters, a list of strings, and the image
+    return cluster_rectangles, text, image

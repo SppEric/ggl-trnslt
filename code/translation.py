@@ -1,7 +1,7 @@
 from translate import Translator
 
 
-def translate_text(text: str, from_lang: str, to_lang) -> str:
+def translate_text(text: str, from_lang: str, to_lang: str) -> str:
     """Takes in an input string and a language and translates the string 
     into that langage.
     Language codes can be found at https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes"""
@@ -9,7 +9,3 @@ def translate_text(text: str, from_lang: str, to_lang) -> str:
     translation = translator.translate(text)
 
     return translation
-
-
-
-# print(translate_text("Hello, how are you doing?", "en", "fr"))
