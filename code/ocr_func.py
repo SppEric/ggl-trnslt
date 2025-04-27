@@ -1,4 +1,5 @@
 import cv2
+import easyocr
 import pytesseract
 import numpy as np
 import matplotlib.pyplot as plt # Matplotlib library for plotting
@@ -11,6 +12,7 @@ from translation import translate_text
 # Variable to generate graphs of the bounding boxes for debugging
 DEBUGGING = True
 
+########## Pytesseract OCR Functions ##########
 # TODO: either use or delete
 def unskew_image(image):
     """Uses pytesseract to detect the skew of the text in an image
@@ -70,8 +72,6 @@ def unskew_image(image):
     #cv2.imwrite('deskewed_image.png', rotated)
 
     return image2, rotation_matrix
-
-
 
 
 def get_bounding_box(image):
@@ -156,69 +156,92 @@ def rect_distance(r1, r2):
     dy = max(y2 - (y1 + h1), y1 - (y2 + h2), 0)
     return (dx**2 + dy**2)**0.5
 
+########## EasyOCR Functions ##########
+def easy_ocr_function(image: str):  
+    """
+    Uses EasyOCR to get the bounding boxes and text from an image
+    The bounding box coordinates are in the format (top-left, top-right, bottom-right, bottom-left)
+    The text is the second to last element of each tuple
+    The confidence score is the last element of each tuple
+    """
+    reader = easyocr.Reader(['ch_sim','en']) # Can specify whether to use GPU or not
+    # Read the image and get the bounding boxes and text
+    result = reader.readtext(image, detail=1, paragraph=True)
+ 
+    # We want to return the bounding boxes and the text, so we will extract those
+    bounding_pts = []
+    text_list = []
+    print(result)
+    for found_text in result:
+        points = found_text[0]
+        text = found_text[1]
 
-def image_processing(image_path: str):
+        top_left, top_right, bottom_right, bottom_left  = points[0], points[1], points[2], points[3]
+        if DEBUGGING:
+            print(f"Bounding box: {points}")
+            print(f"Text: {text}")
+            
+        # Do some conversion to get the bounding box in the format (x, y, w, h)
+        # If we change to only using easyOCR, we can adjust out clustering function to use this format
+        bounding_pts.append((top_left[0], top_left[1], bottom_right[0] - top_left[0], bottom_right[1] - top_left[1]))
+        text_list.append(text)
+    
+    return bounding_pts, text_list
+
+########## Perform Image Processing ##########
+def image_processing(image_path: str, using_pytesseract=False):
     """takes in an image path and returns the bounding boxes of all words in the image,
     as well as the text contained in the image"""
     # Load the image
     image = cv2.imread(image_path)
-    # Convert image to RGB (OpenCV loads images in BGR) - Not needed
-    # TODO: cut this out if we don't need it
-    # rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
+    ## Perform image processing to remove noise, skew, etc.
     # unskewed_image, skew_num = unskew_image(image)
     # text = get_text(image)
-    # get the bounding boxes
-    bounding_pts = get_bounding_box(image)
-    # cluster the bounding boxes
-    cluster_rectangles = cluster_boxes(bounding_pts)
 
+    ## Perform OCR on the image using pytesseract or EasyOCR
+    bounding_pts = []
+    cluster_rectangles = []
     text_list = []
-    for ex in cluster_rectangles:
-        # crop the image around the boxes and get the text from that image
-        x, y, w, h = ex
-        cropped_image = image[y:y+h, x:x+w]
-        text = get_text(cropped_image)
-        text = str.replace(text, "\n", " ")
-        print(text)
-        text_list.append(text)
 
+    if using_pytesseract:
+        ## Code for using Pytesseract
+        # get the bounding boxes
+        bounding_pts = get_bounding_box(image)
+        # cluster the bounding boxes
+        cluster_rectangles = cluster_boxes(bounding_pts)
+        for ex in cluster_rectangles:
+            # crop the image around the boxes and get the text from that image
+            x, y, w, h = ex
+            cropped_image = image[y:y+h, x:x+w]
+            text = get_text(cropped_image)
+            text = str.replace(text, "\n", " ")
+            print(text)
+            text_list.append(text)
+    else:
+        ## Code for using EasyOCR
+        # EasyOCR has a different format for the bounding boxes and text 
+        # We get the boudning boxes and text from one call to the reader
+        bounding_pts, text_list = easy_ocr_function(image)
     
-    return image, text_list, bounding_pts, cluster_rectangles #, skew_num
-
-
-def ocr_function(filepath: str):
-    """Runs the functionality of the file, taking in an input filepath,
-    running OCR on it, and returning the text and bounding boxes of the image"""
-    # Plot the clustered boundaries
-    image, text, bounding_boxes, cluster_rectangles = image_processing(filepath)
-    # image, text, bounding_pts = image_processing("code/skew.png")
-    # image, text, bounding_pts, skew_num = image_processing("code/PbjyR.png")
-    
+        # TODO: See if clustering is needed for EasyOCR - it may be able to do it on its own
+        cluster_rectangles = bounding_pts
 
     if DEBUGGING:
         fig, ax = plt.subplots()
         ax.imshow(image)
 
-
         # Original rectangles in blue
-        for x, y, w, h in bounding_boxes:
+        for x, y, w, h in bounding_pts:
             ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='blue', facecolor='none', linewidth=1, linestyle='--'))
 
         # Merged rectangles in red
         for x, y, w, h in cluster_rectangles:
             ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='red', facecolor='none', linewidth=2))
         
-        # plt.gca().invert_yaxis()  # Flip Y axis to match typical top-left origin
         plt.axis('equal')
         plt.title("Blue = Original Rectangles, Red = Merged Clusters")
         plt.show()
 
-
-        print(bounding_boxes)
-        # print(text)
-
-        # print(translate_text(text, "en", "fr"))
-
     # return a list of clusters, a list of strings, and the image
-    return cluster_rectangles, text, image
+    return cluster_rectangles, text_list, image

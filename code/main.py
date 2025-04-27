@@ -2,7 +2,7 @@ import argparse
 import os
 import cv2
 import pytesseract
-from ocr_func import ocr_function
+from ocr_func import image_processing
 from translation import translate_text
 from projection import project_text_onto_image
 import matplotlib.pyplot as plt
@@ -49,7 +49,7 @@ if __name__ == "__main__":
         print(f"Image to read: {image_path}")
 
     # Call code to process the image to get the text, bounding boxes, and fixed image (if adjusting for skew)
-    cluster_rectangles, texts, image = ocr_function(image_path)
+    cluster_rectangles, texts, image = image_processing(image_path)
     translated_texts = []
     for text in texts:
         # Code to translate the text using the translation API

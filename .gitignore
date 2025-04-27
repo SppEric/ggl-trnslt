@@ -13,3 +13,5 @@
 **/.DS_Store/
 .vscode
 .idea
+venv
+./code/__pycache__/
