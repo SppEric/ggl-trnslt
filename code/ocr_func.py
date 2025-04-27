@@ -167,12 +167,11 @@ def easy_ocr_function(image: str):
     # TODO: HARD CODED TO ONLY USE THE ENGLISH MODEL - need to change this to use the inputed language
     reader = easyocr.Reader(['en'], gpu=True) # Can specify whether to use GPU or not
     # Read the image and get the bounding boxes and text
-    result = reader.readtext(image, detail=1, paragraph=True, rotation_info=[0, 60, 300], decoder="wordbeamsearch")
+    result = reader.readtext(image, detail=1, paragraph=True, rotation_info=[0, 90, 180, 270], decoder="wordbeamsearch")
  
     # We want to return the bounding boxes and the text, so we will extract those
     bounding_pts = []
     text_list = []
-    print(result)
     for found_text in result:
         points = found_text[0]
         text = found_text[1]
