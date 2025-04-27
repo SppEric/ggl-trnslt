@@ -164,9 +164,10 @@ def easy_ocr_function(image: str):
     The text is the second to last element of each tuple
     The confidence score is the last element of each tuple
     """
-    reader = easyocr.Reader(['ch_sim','en']) # Can specify whether to use GPU or not
+    # TODO: HARD CODED TO ONLY USE THE ENGLISH MODEL - need to change this to use the inputed language
+    reader = easyocr.Reader(['en'], gpu=True) # Can specify whether to use GPU or not
     # Read the image and get the bounding boxes and text
-    result = reader.readtext(image, detail=1, paragraph=True)
+    result = reader.readtext(image, detail=1, paragraph=True, rotation_info=[0, 60, 300], decoder="wordbeamsearch")
  
     # We want to return the bounding boxes and the text, so we will extract those
     bounding_pts = []
