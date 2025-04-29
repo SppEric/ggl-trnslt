@@ -49,12 +49,12 @@ if __name__ == "__main__":
         print(f"Image to read: {image_path}")
 
     # Call code to process the image to get the text, bounding boxes, and fixed image (if adjusting for skew)
-    cluster_rectangles, texts, image = image_processing(image_path)
+    cluster_rectangles, texts, image = image_processing(image_path, from_lang)
     translated_texts = []
     for text in texts:
         # Code to translate the text using the translation API
         translation = translate_text(text, from_lang, to_lang)
-        translated_texts.append(translation) 
+        translated_texts.append(translation)
 
     if DEBUGGING:
         print(f"Original text: {texts}")
