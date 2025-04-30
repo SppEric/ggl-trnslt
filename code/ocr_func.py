@@ -19,7 +19,7 @@ def easy_ocr_function(image: str, from_lang: str):
     # TODO: Create dictioniary to map standardized language codes to EasyOCR language codes
     reader = easyocr.Reader([from_lang], gpu=True) # Can specify whether to use GPU or not
     # Read the image and get the bounding boxes and text
-    result = reader.readtext(image, detail=1, paragraph=False, rotation_info=[0, 90, 180, 270], decoder="wordbeamsearch")
+    result = reader.readtext(image, detail=1, paragraph=True, rotation_info=[0, 90, 180, 270], decoder="wordbeamsearch")
  
     # We want to return the bounding boxes and the text, so we will extract those
     bounding_pts = []
@@ -46,6 +46,8 @@ def image_processing(image_path: str, from_lang: str):
     as well as the text contained in the image"""
     # Load the image
     image = cv2.imread(image_path)
+    image = image[...,::-1]
+
 
     ## Perform image processing to remove noise, skew, etc.
     # unskewed_image, skew_num = unskew_image(image)
