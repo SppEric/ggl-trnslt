@@ -68,6 +68,7 @@ def process_image(image_path, from_lang, to_lang):
     img = Image.fromarray(altered_image, 'RGB')
     img.save(output_filepath)
 
+    
     plt.imshow(altered_image)
     plt.show()
 
