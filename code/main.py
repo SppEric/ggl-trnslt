@@ -6,6 +6,7 @@ from ocr_func import image_processing
 from translation import translate_text
 from projection import project_text_onto_image
 import matplotlib.pyplot as plt
+from PIL import Image
 
 DEBUGGING = True
 
@@ -42,9 +43,7 @@ def parse_arguments():
     
     return image_path, args.from_lang, args.to_lang
 
-if __name__ == "__main__":
-    image_path, from_lang, to_lang = parse_arguments()
-
+def process_image(image_path, from_lang, to_lang):
     if DEBUGGING:
         print(f"Image to read: {image_path}")
 
@@ -65,5 +64,16 @@ if __name__ == "__main__":
     if DEBUGGING:
         print("projected image done")
 
+    output_filepath = os.path.join('outputs', image_path)
+    img = Image.fromarray(altered_image, 'RGB')
+    img.save(output_filepath)
+
     plt.imshow(altered_image)
     plt.show()
+
+    return output_filepath
+
+if __name__ == "__main__":
+    image_path, from_lang, to_lang = parse_arguments()
+    process_image(image_path, from_lang, to_lang)
+    

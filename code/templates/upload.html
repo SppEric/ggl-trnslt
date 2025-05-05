@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Image</title>
+    <script>
+        function disableFormOnSubmit(form) {
+            const elements = form.elements;
+            for (let i = 0; i < elements.length; i++) {
+                elements[i].disabled = true;
+            }
+
+            const loading = document.createElement('p');
+            loading.innerText = 'Processing... please wait.';
+            form.appendChild(loading);
+        }
+    </script>
+</head>
+<body>
+    <h1>Upload an Image</h1>
+    {% if processed_image %}
+        <h2>Processed Image:</h2>
+        <img src="{{ url_for('processed_image') }}" alt="Processed Image" style="max-width: 400px;">
+        <hr>
+    {% endif %}
+    <form action="{{ url_for('upload_image') }}" method="post" enctype="multipart/form-data">
+        <!-- Image upload -->
+        <input type="file" name="image" accept="image/*" required><br><br>
+
+        <!-- Dropdown 1 -->
+        <label for="From Language">Translate from:</label>
+        <select name="from_lang" id="from_lang" required>
+            <option value="en">en</option>
+            <option value="fr">fr</option>
+            <option value="es">es</option>
+            <option value="zh">zh</option>
+        </select><br><br>
+
+        <!-- Dropdown 2 -->
+        <label for="To Language">Translate to:</label>
+        <select name="to_lang" id="to_lang" required>
+            <option value="en">en</option>
+            <option value="fr">fr</option>
+            <option value="es">es</option>
+            <option value="zh">zh</option>
+        </select><br><br>
+
+        <!-- Submit button -->
+        <input type="submit" value="Upload">
+    </form>
+</body>
+</html>

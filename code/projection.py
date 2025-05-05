@@ -20,7 +20,7 @@ def project_text_onto_image(image, texts, rectangles):
         x1, y1, width, height = rect
 
         # Create a blank canvas for the text
-        text_canvas = Image.new('L', (width, height), 0)
+        text_canvas = Image.new('RGB', (width, height), 0)
         text_draw = ImageDraw.Draw(text_canvas)
 
         # TODO: Should probably not be needed, now that we aren't running in paragraph=True
@@ -47,11 +47,9 @@ def project_text_onto_image(image, texts, rectangles):
         avg_g = int(np.average([color[1] for color in corner_colors]))
         avg_b = int(np.average([color[2] for color in corner_colors]))
         print(avg_r, avg_g, avg_b)
-        hex_avg_color = '#{:02X}{:02X}{:02X}'.format(avg_r, avg_g, avg_b)
 
         # draw a background rectangle using this color
-
-        text_draw.rectangle([(0, 0), (w, h)], fill=hex_avg_color)
+        text_draw.rectangle([(0, 0), (w, h)], fill=(avg_r, avg_g, avg_b))
         text_draw.multiline_text((0, 0), lines, font=font, fill=0)
 
         # Convert the text canvas to a numpy array
