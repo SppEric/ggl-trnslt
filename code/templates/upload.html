@@ -6,47 +6,109 @@
         function disableFormOnSubmit(form) {
             const elements = form.elements;
             for (let i = 0; i < elements.length; i++) {
-                elements[i].disabled = true;
+                const el = elements[i];
+
+                // Log to check which elements are being disabled
+                console.log('Element:', el);
+                
+                // Do NOT disable file input, select dropdowns since it won't send the data
+                // We just disable the submit button so the user can't click it again
+                if (el.type !== 'file' && el.tagName !== 'SELECT') {
+                    el.disabled = true;
+                }
             }
 
-            const loading = document.createElement('p');
-            loading.innerText = 'Processing... please wait.';
-            form.appendChild(loading);
+            // Show the spinner
+            const spinner = document.getElementById('spinner');
+            if (spinner) {
+                spinner.classList.remove('hidden');
+            }
+
+            return true;
         }
     </script>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <h1>Upload an Image</h1>
+<body class="bg-gray-100 font-sans min-h-screen flex flex-col items-center py-10 px-4">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">CS1430 Final Project - Ggl Trnslt</h1>
+    <h2 class="text-xl font-semibold text-gray-700 mb-4">Upload an image to translate:</h2>
 
-    {% if processed_image %}
-        <h2>Processed Image:</h2>
-        <img src="{{ url_for('get_processed_image', filename=processed_image) }}" alt="Processed Image" style="max-width: 400px;">
-        <hr>
+    {% if original_image and processed_image %}
+    <div class="flex flex-col sm:flex-row items-center justify-center gap-6 mb-8">
+        <div class="text-center">
+            <h2 class="text-lg font-semibold text-gray-700 mb-2">Original Image:</h2>
+            <img src="{{ url_for('get_original_image', filename=original_image) }}" alt="Original Image"
+                 class="max-w-xs rounded shadow">
+        </div>
+        <div class="text-center">
+            <h2 class="text-lg font-semibold text-gray-700 mb-2">Translated Image:</h2>
+            <img src="{{ url_for('get_processed_image', filename=processed_image) }}" alt="Processed Image"
+                 class="max-w-xs rounded shadow">
+        </div>
+    </div>
+    <hr class="my-4 border-gray-300">
     {% endif %}
-    <form action="{{ url_for('upload_image') }}" method="post" enctype="multipart/form-data">
+
+    <body class="bg-gray-100 font-sans min-h-screen flex flex-col items-center py-10 px-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6 w-full max-w-md text-center">
+                    {% for message in messages %}
+                        <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+    <form action="{{ url_for('upload_image') }}" 
+          method="post" 
+          enctype="multipart/form-data"
+          class="bg-white p-6 rounded-lg shadow-md w-full max-w-md space-y-4"
+          onsubmit="return disableFormOnSubmit(this)">
         <!-- Image upload -->
-        <input type="file" name="image" accept="image/*" required><br><br>
+        <input type="file" name="image" accept="image/*" required
+               class="block w-full text-sm text-gray-700 border border-gray-300 rounded-md shadow-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
 
         <!-- Dropdown 1 -->
-        <label for="From Language">Translate from:</label>
-        <select name="from_lang" id="from_lang" required>
-            <option value="en">en</option>
-            <option value="fr">fr</option>
-            <option value="es">es</option>
-            <option value="zh">zh</option>
-        </select><br><br>
+        <div>
+            <label for="from_lang" class="block text-sm font-medium text-gray-700">Translate from:</label>
+            <select name="from_lang" id="from_lang" required
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="en">en</option>
+                <option value="fr">fr</option>
+                <option value="es">es</option>
+                <option value="zh">zh</option>
+            </select>
+        </div>
 
         <!-- Dropdown 2 -->
-        <label for="To Language">Translate to:</label>
-        <select name="to_lang" id="to_lang" required>
-            <option value="en">en</option>
-            <option value="fr">fr</option>
-            <option value="es">es</option>
-            <option value="zh">zh</option>
-        </select><br><br>
+        <div>
+            <label for="to_lang" class="block text-sm font-medium text-gray-700">Translate to:</label>
+            <select name="to_lang" id="to_lang" required
+                    class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="en">en</option>
+                <option value="fr">fr</option>
+                <option value="es">es</option>
+                <option value="zh">zh</option>
+            </select>
+        </div>
 
         <!-- Submit button -->
-        <input type="submit" value="Upload">
+        <input type="submit" value="Upload"
+               class="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 transition duration-200">
+
+        <!-- Spinner -->
+        <div id="spinner" class="hidden flex items-center justify-center mt-4">
+            <svg class="animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none"
+                 viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10"
+                      stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            <span class="ml-2 text-blue-600 font-medium">Processing...</span>
+          </div>
     </form>
 </body>
+
 </html>
