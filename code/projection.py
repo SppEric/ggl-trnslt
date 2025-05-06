@@ -16,7 +16,8 @@ def project_text_onto_image(image, texts, rectangles):
     pixels = pil_image.load()
 
     # Iterate over the rectangles and project the text
-    for rect, text in zip(rectangles, texts):
+    for pair, text in zip(rectangles, texts):
+        rect, lines = pair
         x1, y1, width, height = rect
 
         # Create a blank canvas for the text
@@ -27,7 +28,8 @@ def project_text_onto_image(image, texts, rectangles):
         # Width should be max number of characters we want
         # To find max number of characters we can fit its = rect width / font_size width
         # Define a font and its size TODO: Customize font to match the original image style
-        font_size = int(np.floor(height / 6))
+       
+        font_size = int(np.floor((height / lines)))
         print(font_size)
         print(width)
         font = ImageFont.truetype("arial.ttf", size=font_size)
