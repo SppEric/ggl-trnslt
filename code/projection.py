@@ -2,6 +2,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
 import matplotlib.pyplot as plt
+import cv2 as cv
 
 def project_text_onto_image(image, texts, rectangles):
     """
@@ -35,8 +36,6 @@ def project_text_onto_image(image, texts, rectangles):
         lines = '\n'.join(lines)
         print(lines)
 
-        # Assuming a white background for simplicity
-        #TODO: Read correct background color from image
         # Get the x and y coordinates of the top left corner of the box
         x, y, w, h = rect
         # Get the RGB values at the corners of the box - one pixel in
@@ -54,6 +53,10 @@ def project_text_onto_image(image, texts, rectangles):
 
         # Convert the text canvas to a numpy array
         text_array = np.array(text_canvas)
+
+        ## Calculate transformation matrix for rotation and scaling
+        # Find corners in the original image to map to the corners of the text canvas
+        dst = cv.cornerHarris(gray,2,3,0.04)
 
         # Resize the text array to fit the rectangle
         #text_array_resized = Image.fromarray(text_array).resize((width, height))

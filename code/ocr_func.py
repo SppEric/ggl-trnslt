@@ -19,7 +19,7 @@ def easy_ocr_function(image: str, from_lang: str):
     # TODO: Create dictioniary to map standardized language codes to EasyOCR language codes
     reader = easyocr.Reader([from_lang], gpu=True) # Can specify whether to use GPU or not
     # Read the image and get the bounding boxes and text
-    result = reader.readtext(image, detail=1, paragraph=True, rotation_info=[0, 90, 180, 270], decoder="wordbeamsearch")
+    result = reader.readtext(image, detail=1, paragraph=False, rotation_info=[0, 90, 180, 270], decoder="wordbeamsearch")
  
     # We want to return the bounding boxes and the text, so we will extract those
     bounding_pts = []
@@ -33,9 +33,9 @@ def easy_ocr_function(image: str, from_lang: str):
             print(f"Bounding box: {points}")
             print(f"Text: {text}")
             
-        # Do some conversion to get the bounding box in the format (x, y, w, h)
         # If we change to only using easyOCR, we can adjust out clustering function to use this format
-        bounding_pts.append((top_left[0], top_left[1], bottom_right[0] - top_left[0], bottom_right[1] - top_left[1]))
+        # bounding_pts.append((top_left[0], top_left[1], bottom_right[0] - top_left[0], bottom_right[1] - top_left[1]))
+        bounding_pts.append((top_left, top_right, bottom_right, bottom_left))
         text_list.append(text)
     
     return bounding_pts, text_list
@@ -58,10 +58,11 @@ def image_processing(image_path: str, from_lang: str):
     cluster_rectangles = []
     text_list = []
 
-    
     ## Code for using EasyOCR
     # EasyOCR has a different format for the bounding boxes and text 
     # We get the boudning boxes and text from one call to the reader
+    # Bounding_pts is a list of tuples, where each tuple is (top-left, top-right, bottom-right, bottom-left)
+    # Each tuple is a list of 4 points, where each point is a tuple of (x, y) coordinates
     bounding_pts, text_list = easy_ocr_function(image, from_lang)
 
     # TODO: See if clustering is needed for EasyOCR - it may be able to do it on its own
@@ -72,13 +73,17 @@ def image_processing(image_path: str, from_lang: str):
         ax.imshow(image)
 
         # Original rectangles in blue
-        for x, y, w, h in bounding_pts:
-            ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='blue', facecolor='none', linewidth=1, linestyle='--'))
+        for top_left, top_right, bottom_right, bottom_left in bounding_pts:
+            print(top_left, top_right, bottom_right, bottom_left)
+            # Draw the points in blue on top of the original image
+            ax.plot([top_left[0], top_right[0], bottom_right[0], bottom_left[0], top_left[0]], 
+                    [top_left[1], top_right[1], bottom_right[1], bottom_left[1], top_left[1]], 'bo-')
+            
 
-        # Merged rectangles in red
-        for x, y, w, h in cluster_rectangles:
-            ax.add_patch(patches.Rectangle((x, y), w, h, edgecolor='red', facecolor='none', linewidth=2))
-        
+            # w = bottom_right[0] - top_left[0]   
+            # h = bottom_right[1] - top_left[1]
+            # ax.add_patch(patches.Rectangle((top_left[0], top_left[1]), w, h, edgecolor='blue', facecolor='none', linewidth=1, linestyle='--'))
+
         plt.axis('equal')
         plt.title("Blue = Original Rectangles, Red = Merged Clusters")
         plt.show()
