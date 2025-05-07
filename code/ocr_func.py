@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt # Matplotlib library for plotting
 import matplotlib.patches as patches
 from sklearn.cluster import DBSCAN
 from collections import defaultdict
+from shapely.geometry import Polygon
+
 import numpy as np
 
 # Variable to generate graphs of the bounding boxes for debugging
@@ -82,22 +84,18 @@ def cluster_boxes(boxes: list, text_list: list):
    
 
 #this calculates the distance between boxes
-def rect_distance(r1, r2):
-    """Calculates distance between boxes"""
-    x1, y1, w1, h1 = r1
-    x2, y2, w2, h2 = r2
+def rect_distance(p1, p2):
+    """Calculates distance between two non-axis-aligned rectangles.
+    Each p is a list of 4 (x, y) tuples: [top_left, top_right, bottom_right, bottom_left]
+    """
 
-    left = max(x1, x2)
-    right = min(x1 + w1, x2 + w2)
-    top = max(y1, y2)
-    bottom = min(y1 + h1, y2 + h2)
+    poly1 = Polygon(p1)
+    poly2 = Polygon(p2)
 
-    if right > left and bottom > top:
-        return 0  # Overlapping
+    if poly1.intersects(poly2):
+        return 0  # They overlap
 
-    dx = max(x2 - (x1 + w1), x1 - (x2 + w2), 0)
-    dy = max(y2 - (y1 + h1), y1 - (y2 + h2), 0)
-    return (dx**2 + dy**2)**0.5
+    return poly1.distance(poly2)
 ########## Perform Image Processing ##########
 def image_processing(image_path: str, from_lang: str):
     """takes in an image path and returns the bounding boxes of all words in the image,
@@ -141,6 +139,8 @@ def image_processing(image_path: str, from_lang: str):
             # w = bottom_right[0] - top_left[0]   
             # h = bottom_right[1] - top_left[1]
             # ax.add_patch(patches.Rectangle((top_left[0], top_left[1]), w, h, edgecolor='blue', facecolor='none', linewidth=1, linestyle='--'))
+
+        print(clustered_text_list)
 
         plt.axis('equal')
         plt.title("Blue = Original Rectangles, Red = Merged Clusters")
