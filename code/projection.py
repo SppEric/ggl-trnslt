@@ -11,7 +11,7 @@ def project_text_onto_image(image, texts, clusters):
     clusters: List of clusters - each cluster is a list of tuples representing the corners of a line
     """
     # Convert the image to a PIL Image object
-    pil_image = Image.fromarray(np.uint8(image)).convert('RGB')
+    pil_image = Image.fromarray(np.uint8(image)).convert('RGBA')
 
     # Get the pixel data of the image
     pixels = pil_image.load()
@@ -64,20 +64,49 @@ def project_text_onto_image(image, texts, clusters):
                     remaining_text = remaining_text[i:]
                     break
 
-            #color
+            if running_width < width:
+                displayed_text = " ".join(remaining_text)
+                remaining_text = []
+        
+            #if there is no text in displayed text
+            while displayed_text == "":
+                font_size = int(font_size - (font_size/12))
+                space_length = line_draw.textlength(text=" ", font=font)
+                font = ImageFont.truetype("arial.ttf", size=font_size)
+                running_width = 0
+
+                for i, word in enumerate(remaining_text):
+                # measure the length of a word + space
+                    word_length = line_draw.textlength(text=word, font=font) + space_length
+                    running_width += word_length
+
+                    # check if less than remaining space
+                    if running_width > width:
+                        displayed_text = " ".join(remaining_text[:i])
+                        remaining_text = remaining_text[i:]
+                        break
+                
+            
+            # color
             corner_colors = [pixels[x1+1, y1+1], pixels[x2-1, y2+1], pixels[x4+1, y4-1], pixels[x3-1, y3-1]]
-            print(corner_colors)
+           
             # Find the average of these colors
             avg_r = int(np.average([color[0] for color in corner_colors]))
             avg_g = int(np.average([color[1] for color in corner_colors]))
             avg_b = int(np.average([color[2] for color in corner_colors]))
-            print(avg_r, avg_g, avg_b)
 
+            brightness = 0.2126 * avg_r + 0.7152 * avg_g + 0.0722 * avg_b
+            text_color = None
+            if brightness >= 128:
+                text_color = (0,0,0)
+            else:
+                text_color = (255, 255, 255)
+            
             # draw a background rectangle using this color
             line_draw.rectangle([(0, 0), (width, height)], fill=(avg_r, avg_g, avg_b))
 
             # Display displayed_text on the line canvas
-            line_draw.text((0, 0), displayed_text, font=font, fill=255) # TODO: Add color to text, change location of text
+            line_draw.text((0, 0), displayed_text, font=font, fill=text_color) # TODO: Add color to text, change location of text
 
             # Convert the new line canvas to a numpy array
             line_array = np.array(line_canvas)
@@ -94,8 +123,50 @@ def project_text_onto_image(image, texts, clusters):
 
             # Add the line to the image
             Image.Image.paste(pil_image, line_image, (int(x1), int(y1)))
-
+    
+        if len(remaining_text) > 0:
+            (x1,y2), (x2,y2),_,_ = lines[-1]
             
+            displayed_text = " ".join(remaining_text)
+            word_length = int(font.getlength(displayed_text)) + 1
+            line_canvas2 = Image.new('RGB', (word_length, height), color=0)
+            line_draw2 = ImageDraw.Draw(line_canvas2)
+            corner_colors = [pixels[x1+1, y1+1], pixels[x2-1, y2+1], pixels[x4+1, y4-1], pixels[x3-1, y3-1]]
+           
+            # Find the average of these colors
+            avg_r = int(np.average([color[0] for color in corner_colors]))
+            avg_g = int(np.average([color[1] for color in corner_colors]))
+            avg_b = int(np.average([color[2] for color in corner_colors]))
+
+            brightness = 0.2126 * avg_r + 0.7152 * avg_g + 0.0722 * avg_b
+            text_color = None
+            if brightness >= 128:
+                text_color = (0,0,0)
+            else:
+                text_color = (255, 255, 255)
+            # draw a background rectangle using this color
+            line_draw2.rectangle([(0, 0), (word_length, height)], fill=(avg_r, avg_g, avg_b))
+
+            # Display displayed_text on the line canvas
+            line_draw2.text((0, 0), displayed_text, font=font, fill=text_color) # TODO: Add color to text, change location of text
+
+            # Convert the new line canvas to a numpy array
+            line_array2 = np.array(line_canvas2)
+            
+            # Rotate the line array to match the angle of the rectangle
+            # Calculate the angle of rotation
+            angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
+            
+            # Rotate the line array
+            line_array2 = cv.warpAffine(line_array2, cv.getRotationMatrix2D((word_length // 2, height // 2), angle, 1), (word_length, height))
+            
+            # Convert the rotated line array back to a PIL Image in integer values
+            line_image2 = Image.fromarray(line_array2)
+
+            # Add the line to the image
+            Image.Image.paste(pil_image, line_image2, (int(x2), int(y2)))
+
+
 
 
 
