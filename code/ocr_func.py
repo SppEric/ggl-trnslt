@@ -20,9 +20,23 @@ def easy_ocr_function(image: str, from_lang: str):
     The confidence score is the last element of each tuple
     """
     # TODO: Create dictioniary to map standardized language codes to EasyOCR language codes
-    reader = easyocr.Reader([from_lang], gpu=True) # Can specify whether to use GPU or not
+    reader = easyocr.Reader(
+        [from_lang], 
+        # GPU stuff
+        gpu=True
+    ) 
+
     # Read the image and get the bounding boxes and text
-    result = reader.readtext(image, detail=1, paragraph=False, rotation_info=[0, 90, 180, 270], decoder="wordbeamsearch")
+    result = reader.readtext(
+        image, 
+        detail=1, 
+        paragraph=False, 
+        rotation_info=[0, 90, 180, 270], 
+        decoder="wordbeamsearch",
+        batch_size=8,
+        # Bounding box parameters 
+        width_ths=1, # Maximum horizontal distance to merge boxes - made a little wider
+    )
  
     # We want to return the bounding boxes and the text, so we will extract those
     bounding_pts = []
@@ -31,7 +45,7 @@ def easy_ocr_function(image: str, from_lang: str):
         points = found_text[0]
         text = found_text[1]
 
-        top_left, top_right, bottom_right, bottom_left  = points[0], points[1], points[2], points[3]
+        top_left, top_right, bottom_right, bottom_left = points[0], points[1], points[2], points[3]
         if DEBUGGING:
             print(f"Bounding box: {points}")
             print(f"Text: {text}")
