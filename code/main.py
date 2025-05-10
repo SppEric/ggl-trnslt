@@ -46,9 +46,12 @@ def parse_arguments():
 def process_image(image_path, from_lang, to_lang):
     if DEBUGGING:
         print(f"Image to read: {image_path}")
+    # Load the image
+    original_image = cv2.imread(image_path)
+    original_image = original_image[...,::-1]
 
     # Call code to process the image to get the text, bounding boxes, and fixed image (if adjusting for skew)
-    cluster_rectangles, texts, image = image_processing(image_path, from_lang)
+    cluster_rectangles, texts, image, rotation_matrix = image_processing(original_image, from_lang)
     translated_texts = []
     for text in texts:
         # Code to translate the text using the translation API
@@ -63,6 +66,20 @@ def process_image(image_path, from_lang, to_lang):
     altered_image = project_text_onto_image(image, translated_texts, cluster_rectangles)
     if DEBUGGING:
         print("projected image done")
+
+    # Apply inverse of the rotation matrix to the image to recorrect for skew
+    if rotation_matrix is not None:
+        # Get original dimensions before any rotation was applied
+        orig_h, orig_w = original_image.shape[:2]
+        
+        # Calculate inverse rotation matrix
+        rotation_matrix_inv = cv2.invertAffineTransform(rotation_matrix)
+        
+        # Warp back using original dimensions
+        altered_image = cv2.warpAffine(altered_image, rotation_matrix_inv, (orig_w, orig_h), 
+                                     flags=cv2.INTER_LINEAR,
+                                     borderMode=cv2.BORDER_CONSTANT,
+                                     borderValue=(255,255,255))
 
     output_filepath = os.path.join('outputs', image_path)
     img = Image.fromarray(altered_image, 'RGB')

@@ -4,6 +4,7 @@ import textwrap
 import matplotlib.pyplot as plt
 import cv2 as cv
 
+DEBUGGING = True
 def project_text_onto_image(image, texts, clusters):
     """
     image: Input image where the text will be projected.
@@ -108,24 +109,30 @@ def project_text_onto_image(image, texts, clusters):
             # Display displayed_text on the line canvas
             line_draw.text((0, 0), displayed_text, font=font, fill=text_color) # TODO: Add color to text, change location of text
 
-            # Convert the new line canvas to a numpy array
-            line_array = np.array(line_canvas)
+            # # Convert the new line canvas to a numpy array
+            # line_array = np.array(line_canvas)
             
             # Rotate the line array to match the angle of the rectangle
             # Calculate the angle of rotation
             angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
+
+            line_image = line_canvas.rotate(angle)
             
-            # Rotate the line array
-            line_array = cv.warpAffine(line_array, cv.getRotationMatrix2D((width // 2, height // 2), angle, 1), (width, height))
+            # # Rotate the line array
+            # line_array = cv.warpAffine(line_array, cv.getRotationMatrix2D((width // 2, height // 2), angle, 1), (width, height))
             
-            # Convert the rotated line array back to a PIL Image in integer values
-            line_image = Image.fromarray(line_array)
+            # # Convert the rotated line array back to a PIL Image in integer values
+            # line_image = Image.fromarray(line_array)
 
             # Add the line to the image
             Image.Image.paste(pil_image, line_image, (int(x1), int(y1)))
+
+            if DEBUGGING:
+                plt.imshow(pil_image)
+                plt.show()
     
         if len(remaining_text) > 0:
-            (x1,y2), (x2,y2),_,_ = lines[-1]
+            (x1,y2), (x2,y2), (x3, y3), (x4, y4) = lines[-1]
             
             displayed_text = " ".join(remaining_text)
             word_length = int(font.getlength(displayed_text)) + 1
@@ -150,21 +157,25 @@ def project_text_onto_image(image, texts, clusters):
             # Display displayed_text on the line canvas
             line_draw2.text((0, 0), displayed_text, font=font, fill=text_color) # TODO: Add color to text, change location of text
 
-            # Convert the new line canvas to a numpy array
-            line_array2 = np.array(line_canvas2)
+            # # Convert the new line canvas to a numpy array
+            # line_array2 = np.array(line_canvas2)
             
             # Rotate the line array to match the angle of the rectangle
             # Calculate the angle of rotation
             angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
             
-            # Rotate the line array
-            line_array2 = cv.warpAffine(line_array2, cv.getRotationMatrix2D((word_length // 2, height // 2), angle, 1), (word_length, height))
+            # # Rotate the line array
+            # line_array2 = cv.warpAffine(line_array2, cv.getRotationMatrix2D((word_length // 2, height // 2), angle, 1), (word_length, height))
             
             # Convert the rotated line array back to a PIL Image in integer values
-            line_image2 = Image.fromarray(line_array2)
+            line_image2 = line_canvas2.rotate(angle)
 
             # Add the line to the image
             Image.Image.paste(pil_image, line_image2, (int(x2), int(y2)))
+
+            if DEBUGGING:
+                plt.imshow(pil_image)
+                plt.show()
 
 
 
