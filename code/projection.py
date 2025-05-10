@@ -21,7 +21,7 @@ def project_text_onto_image(image, texts, clusters):
         num_lines = len(lines)
         all_text = text.split()
         print(all_text)
-        buckets = bucketize_text_balanced(all_text, num_lines)
+        buckets = bucketize_text_almost_evenly(all_text, num_lines)
         print(buckets)
         # split_text = str.split(text)
         # num_words = len(split_text)
@@ -43,7 +43,7 @@ def project_text_onto_image(image, texts, clusters):
 
             # Now use height for font size 
             # Define a font and its size TODO: Customize font to match the original image style
-            font_size = int(np.floor((height - (height/4))))
+            font_size = int(np.floor((height - (height/5))))
             font = ImageFont.truetype("arial.ttf", size=font_size)
 
             # Create a blank canvas for the text
@@ -236,48 +236,62 @@ def project_text_onto_image(image, texts, clusters):
     return np.asarray(pil_image)
 
 
-def bucketize_text_balanced(words, num_lines):
-    total_chars = sum(len(w) for w in words) + len(words) - 1
-    target_len = total_chars / num_lines
+def bucketize_text_almost_evenly(words, num_lines):
 
+    n = len(words)
+
+    if num_lines >= n:
+        return words + [''] * (num_lines - n)
+
+    # Precompute lengths including spaces
+    word_lengths = [len(w) for w in words]
+    space_lengths = [1] * (n - 1) + [0]  # no trailing space after last word
+    total_chars = sum(word_lengths) + sum(space_lengths)
+    target = total_chars / num_lines
+
+    # Step 1: Greedy pass to get initial bucket breaks
     buckets = []
     current_bucket = []
     current_len = 0
     i = 0
-
-    while i < len(words):
-        word = words[i]
-        word_len = len(word) + (1 if current_bucket else 0)
-        projected_len = current_len + word_len
-
-        remaining_words = len(words) - i - 1
-        remaining_buckets = num_lines - len(buckets) - 1
-
-        # If we're on the last bucket, just add all remaining words
-        if remaining_buckets == 0:
-            current_bucket.append(word)
-            current_len = projected_len
-            i += 1
-            continue
-
-        # Evaluate cost of adding vs. starting a new bucket
-        cost_add = abs(projected_len - target_len)
-        cost_new = abs(current_len - target_len)
-
-        # Prefer to add word if it keeps us closer to target
-        if cost_add <= cost_new or remaining_words < remaining_buckets:
-            current_bucket.append(word)
-            current_len = projected_len
-            i += 1
-        else:
-            buckets.append(' '.join(current_bucket))
+    while i < n:
+        word_len = word_lengths[i]
+        space = 1 if current_bucket else 0
+        if current_len + word_len + space > target and len(buckets) < num_lines - 1:
+            buckets.append(current_bucket)
             current_bucket = []
             current_len = 0
-
+        else:
+            current_bucket.append(words[i])
+            current_len += word_len + space
+            i += 1
     if current_bucket:
-        buckets.append(' '.join(current_bucket))
+        buckets.append(current_bucket)
 
-    while len(buckets) < num_lines:
-        buckets.append('')
+    # Step 2: Refine with best local redistribution
+    def bucket_char_len(bucket):
+        return sum(len(w) for w in bucket) + max(0, len(bucket) - 1)
 
-    return buckets
+    improved = True
+    while improved:
+        improved = False
+        for i in range(len(buckets) - 1):
+            left = buckets[i]
+            right = buckets[i + 1]
+            if not right:
+                continue
+
+            # Try moving first word from right to end of left
+            move_word = right[0]
+            new_left = left + [move_word]
+            new_right = right[1:]
+
+            old_diff = abs(bucket_char_len(left) - target) + abs(bucket_char_len(right) - target)
+            new_diff = abs(bucket_char_len(new_left) - target) + abs(bucket_char_len(new_right) - target)
+
+            if new_diff < old_diff:
+                buckets[i] = new_left
+                buckets[i + 1] = new_right
+                improved = True
+
+    return [' '.join(bucket) for bucket in buckets]
