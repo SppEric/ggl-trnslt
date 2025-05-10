@@ -19,7 +19,10 @@ def project_text_onto_image(image, texts, clusters):
     # Iterate over the rectangles and project the text
     for lines, text in zip(clusters, texts):
         num_lines = len(lines)
-        remaining_text = text.split(" ")
+        all_text = text.split()
+        print(all_text)
+        buckets = bucketize_text_balanced(all_text, num_lines)
+        print(buckets)
         # split_text = str.split(text)
         # num_words = len(split_text)
         # words_per_line = num_words // num_lines
@@ -28,7 +31,9 @@ def project_text_onto_image(image, texts, clusters):
         # text_list = [" ".join(words) for words in text_list]
         
         # Now perform steps for each line in lines to display them
-        for line in lines:
+        for words, line in zip(buckets, lines):
+          
+            remaining_text = words.split()
             # Get the coordinates of the rectangle
             # x1-4 are the coordinates of the four corners of the rectangle clockwise starting from top left
             (x1, y1), (x2, y2), (x3, y3), (x4, y4) = line
@@ -53,39 +58,46 @@ def project_text_onto_image(image, texts, clusters):
             # for each word:
             running_width = 0
             displayed_text = ""
-            for i, word in enumerate(remaining_text):
-                # measure the length of a word + space
-                word_length = line_draw.textlength(text=word, font=font) + space_length
-                running_width += word_length
+            # for i, word in enumerate(remaining_text):
+            #     # measure the length of a word + space
+            #     word_length = line_draw.textlength(text=word, font=font) + space_length
+            #     running_width += word_length
 
-                # check if less than remaining space
-                if running_width > width:
-                    displayed_text = " ".join(remaining_text[:i])
-                    remaining_text = remaining_text[i:]
-                    break
+            #     # check if less than remaining space
+            #     if running_width > width:
+            #         displayed_text = " ".join(remaining_text[:i])
+            #         remaining_text = remaining_text[i:]
+            #         break
 
-            if running_width < width:
-                displayed_text = " ".join(remaining_text)
-                remaining_text = []
-        
+           
             #if there is no text in displayed text
-            while displayed_text == "":
-                font_size = int(font_size - (font_size/12))
+            while displayed_text == "" and words != "":
+
                 space_length = line_draw.textlength(text=" ", font=font)
-                font = ImageFont.truetype("arial.ttf", size=font_size)
+                
                 running_width = 0
 
                 for i, word in enumerate(remaining_text):
                 # measure the length of a word + space
+
                     word_length = line_draw.textlength(text=word, font=font) + space_length
                     running_width += word_length
 
                     # check if less than remaining space
                     if running_width > width:
-                        displayed_text = " ".join(remaining_text[:i])
-                        remaining_text = remaining_text[i:]
+                        # displayed_text = " ".join(remaining_text[:i])
+                        # remaining_text = remaining_text[i:]
                         break
-                
+                    
+                if running_width <= width:
+                    displayed_text = " ".join(remaining_text)
+                    remaining_text = []
+            
+                font_size = int(font_size - (font_size/12))
+                font = ImageFont.truetype("arial.ttf", size=font_size)
+            if font_size <= 0:
+                font_size = 1
+                font = ImageFont.truetype("arial.ttf", size=font_size)
             
             # color
             corner_colors = [pixels[x1+1, y1+1], pixels[x2-1, y2+1], pixels[x4+1, y4-1], pixels[x3-1, y3-1]]
@@ -124,47 +136,49 @@ def project_text_onto_image(image, texts, clusters):
             # Add the line to the image
             Image.Image.paste(pil_image, line_image, (int(x1), int(y1)))
     
-        if len(remaining_text) > 0:
-            (x1,y2), (x2,y2),_,_ = lines[-1]
+        # if len(remaining_text) > 0:
+        #     (x1,y2), (x2,y2),_,_ = lines[-1]
             
-            displayed_text = " ".join(remaining_text)
-            word_length = int(font.getlength(displayed_text)) + 1
-            line_canvas2 = Image.new('RGB', (word_length, height), color=0)
-            line_draw2 = ImageDraw.Draw(line_canvas2)
-            corner_colors = [pixels[x1+1, y1+1], pixels[x2-1, y2+1], pixels[x4+1, y4-1], pixels[x3-1, y3-1]]
+        #     displayed_text = " ".join(remaining_text)
+        #     word_length = int(font.getlength(displayed_text)) + 1
+        #     line_canvas2 = Image.new('RGB', (word_length, height), color=0)
+        #     line_draw2 = ImageDraw.Draw(line_canvas2)
+        #     corner_colors = [pixels[x1+1, y1+1], pixels[x2-1, y2+1], pixels[x4+1, y4-1], pixels[x3-1, y3-1]]
            
-            # Find the average of these colors
-            avg_r = int(np.average([color[0] for color in corner_colors]))
-            avg_g = int(np.average([color[1] for color in corner_colors]))
-            avg_b = int(np.average([color[2] for color in corner_colors]))
+        #     # Find the average of these colors
+        #     avg_r = int(np.average([color[0] for color in corner_colors]))
+        #     avg_g = int(np.average([color[1] for color in corner_colors]))
+        #     avg_b = int(np.average([color[2] for color in corner_colors]))
 
-            brightness = 0.2126 * avg_r + 0.7152 * avg_g + 0.0722 * avg_b
-            text_color = None
-            if brightness >= 128:
-                text_color = (0,0,0)
-            else:
-                text_color = (255, 255, 255)
-            # draw a background rectangle using this color
-            line_draw2.rectangle([(0, 0), (word_length, height)], fill=(avg_r, avg_g, avg_b))
+        #     brightness = 0.2126 * avg_r + 0.7152 * avg_g + 0.0722 * avg_b
+        #     text_color = None
+        #     if brightness >= 128:
+        #         text_color = (0,0,0)
+        #     else:
+        #         text_color = (255, 255, 255)
+        #     # draw a background rectangle using this color
+        #     line_draw2.rectangle([(0, 0), (word_length, height)], fill=(avg_r, avg_g, avg_b))
 
-            # Display displayed_text on the line canvas
-            line_draw2.text((0, 0), displayed_text, font=font, fill=text_color) # TODO: Add color to text, change location of text
+        #     # Display displayed_text on the line canvas
+        #     line_draw2.text((0, 0), displayed_text, font=font, fill=text_color) # TODO: Add color to text, change location of text
 
-            # Convert the new line canvas to a numpy array
-            line_array2 = np.array(line_canvas2)
+        #     _, im_width = pil_image.size
             
-            # Rotate the line array to match the angle of the rectangle
-            # Calculate the angle of rotation
-            angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
+        #     # Convert the new line canvas to a numpy array
+        #     line_array2 = np.array(line_canvas2)
             
-            # Rotate the line array
-            line_array2 = cv.warpAffine(line_array2, cv.getRotationMatrix2D((word_length // 2, height // 2), angle, 1), (word_length, height))
+        #     # Rotate the line array to match the angle of the rectangle
+        #     # Calculate the angle of rotation
+        #     angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
             
-            # Convert the rotated line array back to a PIL Image in integer values
-            line_image2 = Image.fromarray(line_array2)
+        #     # Rotate the line array
+        #     line_array2 = cv.warpAffine(line_array2, cv.getRotationMatrix2D((word_length // 2, height // 2), angle, 1), (word_length, height))
+            
+        #     # Convert the rotated line array back to a PIL Image in integer values
+        #     line_image2 = Image.fromarray(line_array2)
 
-            # Add the line to the image
-            Image.Image.paste(pil_image, line_image2, (int(x2), int(y2)))
+        #     # Add the line to the image
+        #     Image.Image.paste(pil_image, line_image2, (int(x2), int(y2)))
 
 
 
@@ -220,3 +234,50 @@ def project_text_onto_image(image, texts, clusters):
     #     Image.Image.paste(pil_image, Image.fromarray(text_array), (x1, y1))
 
     return np.asarray(pil_image)
+
+
+def bucketize_text_balanced(words, num_lines):
+    total_chars = sum(len(w) for w in words) + len(words) - 1
+    target_len = total_chars / num_lines
+
+    buckets = []
+    current_bucket = []
+    current_len = 0
+    i = 0
+
+    while i < len(words):
+        word = words[i]
+        word_len = len(word) + (1 if current_bucket else 0)
+        projected_len = current_len + word_len
+
+        remaining_words = len(words) - i - 1
+        remaining_buckets = num_lines - len(buckets) - 1
+
+        # If we're on the last bucket, just add all remaining words
+        if remaining_buckets == 0:
+            current_bucket.append(word)
+            current_len = projected_len
+            i += 1
+            continue
+
+        # Evaluate cost of adding vs. starting a new bucket
+        cost_add = abs(projected_len - target_len)
+        cost_new = abs(current_len - target_len)
+
+        # Prefer to add word if it keeps us closer to target
+        if cost_add <= cost_new or remaining_words < remaining_buckets:
+            current_bucket.append(word)
+            current_len = projected_len
+            i += 1
+        else:
+            buckets.append(' '.join(current_bucket))
+            current_bucket = []
+            current_len = 0
+
+    if current_bucket:
+        buckets.append(' '.join(current_bucket))
+
+    while len(buckets) < num_lines:
+        buckets.append('')
+
+    return buckets
