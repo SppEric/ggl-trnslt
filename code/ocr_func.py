@@ -140,6 +140,7 @@ def easy_ocr_function(image: str, from_lang: str):
             width_ths=1.5, # Maximum horizontal distance to merge boxes - made a little wider)
     )
 
+
     if DEBUGGING:
         fig, ax = plt.subplots()
         ax.imshow(image)
@@ -161,11 +162,13 @@ def easy_ocr_function(image: str, from_lang: str):
 
 
     # Count whether there is a large amount of straight text or text that is rotated
-    straight_text_count = len(bounding_boxes[0])
-    rotated_text_count = len(bounding_boxes[1])
+    straight_text_count = len(bounding_boxes[0][0])
+    rotated_text_count = len(bounding_boxes[1][0])
+    print(straight_text_count)
+    print(rotated_text_count)
 
     rotation_matrix = None
-    if straight_text_count > rotated_text_count: # This is naive, potentially will not work
+    if straight_text_count < rotated_text_count: # This is naive, potentially will not work
         # Calculate average text orientation from bounding boxes
         angles = []
         for points in bounding_boxes[1][0]: # bounding_boxes[1] is the list of free form bounding boxes
@@ -175,10 +178,11 @@ def easy_ocr_function(image: str, from_lang: str):
             angles.append(angle)
         
         mean_angle = np.mean(angles) if angles else 0
+        print(angles)
         
         
         # Create rotation matrix and apply rotation if skew detected
-        if abs(mean_angle) > 0.2:  # Only correct if angle is significant
+        if abs(mean_angle) > 0.1:  # Only correct if angle is significant
             print("Rotation matrix necessary!")
             height, width = image.shape[:2]
             center = (width/2, height/2)
@@ -197,10 +201,10 @@ def easy_ocr_function(image: str, from_lang: str):
             # Apply rotation
             image = cv2.warpAffine(image, rotation_matrix, (new_w, new_h), borderMode=cv2.BORDER_REPLICATE)
 
-            # # Display the corrected image
-            # plt.imshow(image)
-            # plt.title("Skew Correction using Average of Free Form Bounding Boxes")
-            # plt.show()
+            # Display the corrected image
+            plt.imshow(image)
+            plt.title("Skew Correction using Average of Free Form Bounding Boxes")
+            plt.show()
         else:
             print("No rotation matrix necessary!")
     
