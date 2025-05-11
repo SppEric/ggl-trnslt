@@ -8,4 +8,7 @@ def translate_text(text: str, from_lang: str, to_lang: str) -> str:
     translator = Translator(to_lang=to_lang, from_lang=from_lang)
     translation = translator.translate(text)
 
+    # Remove any special character whitespace
+    translation = translation.replace("\xa0", "")
+
     return translation

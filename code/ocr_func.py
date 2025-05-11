@@ -135,77 +135,130 @@ def easy_ocr_function(image: str, from_lang: str):
     # Read the image and get the bounding boxes
     bounding_boxes = reader.detect(
             image,
-            mag_ratio=1.5, # Increase the size of the image to improve accuracy
+            mag_ratio=1, # Increase the size of the image to improve accuracy
             # Bounding box parameters 
-            width_ths=1, # Maximum horizontal distance to merge boxes - made a little wider )
+            width_ths=1.5, # Maximum horizontal distance to merge boxes - made a little wider)
     )
-    # Calculate average text orientation from bounding boxes
-    angles = []
-    for points in bounding_boxes[1][0]: # bounding_boxes[1] is the list of free form bounding boxes
-        print(points)
-        top_left, top_right, _, _ = points
-        angle = np.arctan2(top_right[1] - top_left[1], top_right[0] - top_left[0]) * 180 / np.pi
-        angles.append(angle)
-    
-    mean_angle = np.median(angles) if angles else 0
-    
-    rotation_matrix = None
-    # Create rotation matrix and apply rotation if skew detected
-    if abs(mean_angle) > 0.2:  # Only correct if angle is significant
-        print("Rotation matrix necessary!")
-        height, width = image.shape[:2]
-        center = (width/2, height/2)
-        rotation_matrix = cv2.getRotationMatrix2D(center, mean_angle, 1)
-        
-        # Calculate new image dimensions
-        cos = np.abs(rotation_matrix[0, 0])
-        sin = np.abs(rotation_matrix[0, 1])
-        new_w = int((height * sin) + (width * cos))
-        new_h = int((height * cos) + (width * sin))
-        
-        # Adjust rotation matrix
-        rotation_matrix[0, 2] += (new_w / 2) - center[0]
-        rotation_matrix[1, 2] += (new_h / 2) - center[1]
-        
-        # Apply rotation
-        image = cv2.warpAffine(image, rotation_matrix, (new_w, new_h), borderMode=cv2.BORDER_REPLICATE)
 
-        # # Display the corrected image
-        # plt.imshow(image)
-        # plt.title("Skew Correction using Average of Free Form Bounding Boxes")
-        # plt.show()
+    if DEBUGGING:
+        fig, ax = plt.subplots()
+        ax.imshow(image)
+
+        # Display free form bounding boxes
+        for top_left, top_right, bottom_right, bottom_left in bounding_boxes[1][0]:
+            # Draw the points in blue on top of the original image
+            ax.plot([top_left[0], top_right[0], bottom_right[0], bottom_left[0], top_left[0]], 
+                    [top_left[1], top_right[1], bottom_right[1], bottom_left[1], top_left[1]], 'bo-')
+            
+        # Display rectangle bounding boxes
+        for x_min, x_max, y_min, y_max in bounding_boxes[0][0]:
+            # Draw the points in red on top of the original image
+            ax.plot([x_min, x_max, x_max, x_min, x_min], [y_min, y_min, y_max, y_max, y_min], 'ro-')
+
+        plt.axis('equal')
+        plt.title("Blue = Free Form Bounding Boxes, Red = Rectangle Bounding Boxes")
+        plt.show()
+
+
+    # Count whether there is a large amount of straight text or text that is rotated
+    straight_text_count = len(bounding_boxes[0])
+    rotated_text_count = len(bounding_boxes[1])
+
+    rotation_matrix = None
+    if straight_text_count > rotated_text_count: # This is naive, potentially will not work
+        # Calculate average text orientation from bounding boxes
+        angles = []
+        for points in bounding_boxes[1][0]: # bounding_boxes[1] is the list of free form bounding boxes
+            print(points)
+            top_left, top_right, _, _ = points
+            angle = np.arctan2(top_right[1] - top_left[1], top_right[0] - top_left[0]) * 180 / np.pi
+            angles.append(angle)
         
-        # Re-run OCR for actual text-reading on corrected image
-        result = reader.readtext(
-            image, 
-            # General parameters
-            detail=1, 
-            batch_size=8,
-            # Detection parameters
-            paragraph=False, 
-            rotation_info=[0, 90, 180, 270], 
-            decoder="wordbeamsearch",
-            mag_ratio=1.5, # Increase the size of the image to improve accuracy
-            # Bounding box parameters 
-            width_ths=1, # Maximum horizontal distance to merge boxes - made a little wider
-        )
-    else:
-        print("No rotation matrix necessary!")
+        mean_angle = np.mean(angles) if angles else 0
+        
+        
+        # Create rotation matrix and apply rotation if skew detected
+        if abs(mean_angle) > 0.2:  # Only correct if angle is significant
+            print("Rotation matrix necessary!")
+            height, width = image.shape[:2]
+            center = (width/2, height/2)
+            rotation_matrix = cv2.getRotationMatrix2D(center, mean_angle, 1)
+            
+            # Calculate new image dimensions
+            cos = np.abs(rotation_matrix[0, 0])
+            sin = np.abs(rotation_matrix[0, 1])
+            new_w = int((height * sin) + (width * cos))
+            new_h = int((height * cos) + (width * sin))
+            
+            # Adjust rotation matrix
+            rotation_matrix[0, 2] += (new_w / 2) - center[0]
+            rotation_matrix[1, 2] += (new_h / 2) - center[1]
+            
+            # Apply rotation
+            image = cv2.warpAffine(image, rotation_matrix, (new_w, new_h), borderMode=cv2.BORDER_REPLICATE)
+
+            # # Display the corrected image
+            # plt.imshow(image)
+            # plt.title("Skew Correction using Average of Free Form Bounding Boxes")
+            # plt.show()
+        else:
+            print("No rotation matrix necessary!")
+    
+    # Re-run OCR for actual text-reading on corrected image
+    result = reader.readtext(
+        image, 
+        # General parameters
+        detail=1, 
+        batch_size=8,
+        # Detection parameters
+        paragraph=False, 
+        rotation_info=[0, 90, 180, 270], 
+        decoder="wordbeamsearch",
+        mag_ratio=1, # Increase the size of the image to improve accuracy
+        # Bounding box parameters 
+        width_ths=2, # Maximum horizontal distance to merge boxes - made a little wider,
+        add_margin=0.05,
+        link_threshold=0.2
+    )
  
     # Extract bounding boxes and text
     bounding_pts = []
     text_list = []
+    
+    # First pass: collect all rectangular boxes
+    rect_boxes = []
+    for found_text in result:
+        points = found_text[0]
+        # Check if this is a rectangular box (all coordinates are integers)
+        if all(isinstance(coord, int) for point in points for coord in point):
+            rect_boxes.append(points)
+    
+    # Second pass: add boxes that don't overlap with rectangular boxes
     for found_text in result:
         points = found_text[0]
         text = found_text[1]
-
-        top_left, top_right, bottom_right, bottom_left = points[0], points[1], points[2], points[3]
-        if DEBUGGING:
-            print(f"Bounding box: {points}")
-            print(f"Text: {text}")
-            
-        bounding_pts.append((top_left, top_right, bottom_right, bottom_left))
-        text_list.append(text)
+        
+        # Check if this is a free-form box (has float coordinates)
+        is_free_form = any(isinstance(coord, float) for point in points for coord in point)
+        
+        if is_free_form:
+            # Check for overlap with any rectangular box
+            overlaps = False
+            for rect_box in rect_boxes:
+                if rect_distance(points, rect_box) == 0:  # 0 means overlap
+                    overlaps = True
+                    print(f"Overlap detected between {text} and {rect_box}")
+                    break
+                    
+            if not overlaps:
+                top_left, top_right, bottom_right, bottom_left = points[0], points[1], points[2], points[3]
+                bounding_pts.append((top_left, top_right, bottom_right, bottom_left))
+                text_list.append(text)
+        else:
+            # Always add rectangular boxes
+            top_left, top_right, bottom_right, bottom_left = points[0], points[1], points[2], points[3]
+            bounding_pts.append((top_left, top_right, bottom_right, bottom_left))
+            text_list.append(text)
     
     return bounding_pts, text_list, image, rotation_matrix
 
@@ -219,8 +272,7 @@ def cluster_boxes(boxes: list, text_list: list):
             dists[i, j] = rect_distance(boxes[i], boxes[j])
 
     # Cluster with DBSCAN
-    clustering = DBSCAN(eps=50, min_samples=1, metric='precomputed')
-    clustering = DBSCAN(eps=30, min_samples=1, metric='precomputed')
+    clustering = DBSCAN(eps=10, min_samples=1, metric='precomputed')
     labels = clustering.fit_predict(dists)
 
     clusters = defaultdict(list)
@@ -282,27 +334,26 @@ def image_processing(image: np.ndarray, from_lang: str):
     # TODO: See if clustering is needed for EasyOCR - it may be able to do it on its own
     cluster_rectangles, clustered_text_list = cluster_boxes(bounding_pts, text_list)
 
-    if DEBUGGING:
-        fig, ax = plt.subplots()
-        ax.imshow(image)
+    # if DEBUGGING:
+    #     fig, ax = plt.subplots()
+    #     ax.imshow(image)
 
-        # Original rectangles in blue
-        for top_left, top_right, bottom_right, bottom_left in bounding_pts:
-            print(top_left, top_right, bottom_right, bottom_left)
-            # Draw the points in blue on top of the original image
-            ax.plot([top_left[0], top_right[0], bottom_right[0], bottom_left[0], top_left[0]], 
-                    [top_left[1], top_right[1], bottom_right[1], bottom_left[1], top_left[1]], 'bo-')
+    #     # Original rectangles in blue
+    #     for top_left, top_right, bottom_right, bottom_left in bounding_pts:
+    #         # Draw the points in blue on top of the original image
+    #         ax.plot([top_left[0], top_right[0], bottom_right[0], bottom_left[0], top_left[0]], 
+    #                 [top_left[1], top_right[1], bottom_right[1], bottom_left[1], top_left[1]], 'bo-')
             
 
-            # w = bottom_right[0] - top_left[0]   
-            # h = bottom_right[1] - top_left[1]
-            # ax.add_patch(patches.Rectangle((top_left[0], top_left[1]), w, h, edgecolor='blue', facecolor='none', linewidth=1, linestyle='--'))
+    #         # w = bottom_right[0] - top_left[0]   
+    #         # h = bottom_right[1] - top_left[1]
+    #         # ax.add_patch(patches.Rectangle((top_left[0], top_left[1]), w, h, edgecolor='blue', facecolor='none', linewidth=1, linestyle='--'))
 
-        print(clustered_text_list)
+    #     print(clustered_text_list)
 
-        plt.axis('equal')
-        plt.title("Blue = Original Rectangles, Red = Merged Clusters")
-        plt.show()
+    #     plt.axis('equal')
+    #     plt.title("Clustered Text")
+    #     plt.show()
 
     # return a list of clusters, a list of strings, and the image
     return cluster_rectangles, clustered_text_list, image, rotation_matrix

@@ -1,10 +1,126 @@
+import math
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
 import matplotlib.pyplot as plt
 import cv2 as cv
 
-DEBUGGING = True
+DEBUGGING = False
+
+def calculate_text_width(text, font_size, font_name="arial.ttf"):
+    """
+    Calculate the total width needed for text at a given font size.
+    
+    Args:
+        text (str): The text to measure
+        font_size (int): The font size to test
+        font_name (str): The font file to use
+        
+    Returns:
+        float: The total width needed for the text
+        list: List of word lengths
+    """
+    # Create a temporary image and draw object for measurement
+    temp_img = Image.new('RGB', (1, 1))
+    temp_draw = ImageDraw.Draw(temp_img)
+    font = ImageFont.truetype(font_name, size=font_size)
+    space_length = temp_draw.textlength(" ", font=font)
+    
+    # Calculate total width including spaces
+    words = text.split()
+    word_lengths = [0 for word in words]
+    total_width = 0
+
+    for i, word in enumerate(words):
+        word_width = temp_draw.textlength(word, font=font)
+        word_lengths[i] = word_width    
+        if i < len(words) - 1:  # Add space width if not the last word
+            total_width += word_width + space_length
+        else:
+            total_width += word_width
+            
+    return total_width, word_lengths
+
+def find_optimal_font_size(text, line_lengths, max_height, font_name="arial.ttf", min_font_size=1):
+    """
+    Find the largest font size that will fit the text within the given dimensions,
+    accounting for potential wasted space from line breaks.
+    
+    Args:
+        text (str): The text to fit
+        line_lengths (list): List of available line lengths
+        max_height (float): Maximum available height
+        font_name (str): The font file to use
+        min_font_size (int): Minimum font size to try
+        
+    Returns:
+        int: The optimal font size
+        list: List of word lengths at optimal font size
+        list: List of booleans indicating which lines need horizontal transformation
+        list: List of strings containing the text for each line
+    """
+    # Start with a large font size and decrease until it fits
+    font_size = max_height
+    word_lengths = [-1 for word in text.split()]
+    
+    while font_size > min_font_size:
+        width, word_lengths = calculate_text_width(text, font_size, font_name)
+        
+        # Create a temporary image and draw object for measurement
+        temp_img = Image.new('RGB', (1, 1))
+        temp_draw = ImageDraw.Draw(temp_img)
+        font = ImageFont.truetype(font_name, size=font_size)
+        space_length = temp_draw.textlength(" ", font=font)
+        
+        # Simulate text layout to check if it fits
+        words = text.split()
+        current_line = 0
+        current_pos = 0
+        fits = True
+        needs_transform = [False] * len(line_lengths)  # Track which lines need transformation
+        line_buckets = [[] for _ in range(len(line_lengths))]  # Store words for each line
+        
+        for i, word in enumerate(words):
+            word_len = word_lengths[i]
+            # Add space if not first word on line
+            if current_pos > 0:
+                word_len += space_length
+                
+            # If word doesn't fit on current line, try next line
+            if current_pos + word_len > line_lengths[current_line]:
+                # Calculate wasted space if we move to next line
+                wasted_space = line_lengths[current_line] - current_pos
+                wasted_percentage = wasted_space / line_lengths[current_line]
+                
+                # If we'd waste more than 20% of the line, mark for transformation
+                if wasted_percentage > 0.2:
+                    needs_transform[current_line] = True
+                    # Continue on same line with transformation
+                    current_pos += word_len
+                    line_buckets[current_line].append(word)
+                else:
+                    # Move to next line
+                    current_line += 1
+                    current_pos = word_len
+                    # If we've run out of lines, text doesn't fit
+                    if current_line >= len(line_lengths):
+                        fits = False
+                        break
+                    line_buckets[current_line].append(word)
+            else:
+                current_pos += word_len
+                line_buckets[current_line].append(word)
+                
+        if fits:
+            # Convert word lists to strings
+            line_texts = [" ".join(bucket) for bucket in line_buckets]
+            return font_size, word_lengths, needs_transform, line_texts
+            
+        font_size = int(font_size * 0.9)  # Reduce by 10% each time
+    
+    # If we couldn't find a fitting size, return empty buckets
+    return min_font_size, word_lengths, [False] * len(line_lengths), [""] * len(line_lengths)
+
 def project_text_onto_image(image, texts, clusters):
     """
     image: Input image where the text will be projected.
@@ -16,234 +132,163 @@ def project_text_onto_image(image, texts, clusters):
 
     # Get the pixel data of the image
     pixels = pil_image.load()
+    original_pixels = np.asarray(pil_image)
 
-    # Iterate over the rectangles and project the text
+    # Iterate over each cluster and project the text
     for lines, text in zip(clusters, texts):
         num_lines = len(lines)
         all_text = text.split()
-        print(all_text)
-        buckets = bucketize_text_almost_evenly(all_text, num_lines)
-        print(buckets)
-        # split_text = str.split(text)
-        # num_words = len(split_text)
-        # words_per_line = num_words // num_lines
-        # text_list = [split_text[i:i + words_per_line] for i in range(0, len(split_text), words_per_line)] 
-        # # text list is now a list of strings, where each string is the w
-        # text_list = [" ".join(words) for words in text_list]
         
+        # Calculate line lengths
+        line_lengths = []
+        for line in lines:
+            (x1, y1), (x2, y2), _, _ = line
+            width = int(np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2))
+            line_lengths.append(width)
+
+        # Find the optimal font size for the entire cluster
+        max_height = min(int(np.sqrt((x1 - x4) ** 2 + (y1 - y4) ** 2)) for (x1, y1), _, _, (x4, y4) in lines)
+        optimal_font_size, word_lengths, needs_transform, buckets = find_optimal_font_size(text, line_lengths, max_height)
+        font = ImageFont.truetype(font="arial.ttf", size=optimal_font_size)
+
         # Now perform steps for each line in lines to display them
-        for words, line in zip(buckets, lines):
-          
-            remaining_text = words.split()
+        for words, line, should_transform in zip(buckets, lines, needs_transform):
             # Get the coordinates of the rectangle
-            # x1-4 are the coordinates of the four corners of the rectangle clockwise starting from top left
             (x1, y1), (x2, y2), (x3, y3), (x4, y4) = line
-            # Calculate the width and height of the rectangle
             width = int(np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2))
             height = int(np.sqrt((x1 - x4) ** 2 + (y1 - y4) ** 2))
 
-            # Now use height for font size 
-            # Define a font and its size TODO: Customize font to match the original image style
-            font_size = int(np.floor((height - (height/5))))
-            font = ImageFont.truetype("arial.ttf", size=font_size)
+            # Create temporary image and draw object
+            temp_img = Image.new('RGB', (1, 1))
+            temp_draw = ImageDraw.Draw(temp_img)
 
-            # Create a blank canvas for the text
-            line_canvas = Image.new('RGB', (width, height), 0)
-            line_draw = ImageDraw.Draw(line_canvas)
 
-            # Calculate the length of a space in the font
-            space_length = line_draw.textlength(text=" ", font=font)
-            
-            # calculate how much of the text should go on the line, 
-            # taking x amount from the beginning of the string based on the height and width of the box
-            # for each word:
-            running_width = 0
-            displayed_text = ""
-            # for i, word in enumerate(remaining_text):
-            #     # measure the length of a word + space
-            #     word_length = line_draw.textlength(text=word, font=font) + space_length
-            #     running_width += word_length
+            # Calculate text dimensions
+            text_height = optimal_font_size
+            text_width = temp_draw.textlength(words, font=font)
 
-            #     # check if less than remaining space
-            #     if running_width > width:
-            #         displayed_text = " ".join(remaining_text[:i])
-            #         remaining_text = remaining_text[i:]
-            #         break
 
-           
-            #if there is no text in displayed text
-            while displayed_text == "" and words != "":
+            # Calculate vertical margin to center the text
+            margin_y = (height - text_height) / 2
 
-                space_length = line_draw.textlength(text=" ", font=font)
-                
-                running_width = 0
-
-                for i, word in enumerate(remaining_text):
-                # measure the length of a word + space
-
-                    word_length = line_draw.textlength(text=word, font=font) + space_length
-                    running_width += word_length
-
-                    # check if less than remaining space
-                    if running_width > width:
-                        # displayed_text = " ".join(remaining_text[:i])
-                        # remaining_text = remaining_text[i:]
-                        break
-                    
-                if running_width <= width:
-                    displayed_text = " ".join(remaining_text)
-                    remaining_text = []
-            
-                font_size = int(font_size - (font_size/12))
-                font = ImageFont.truetype("arial.ttf", size=font_size)
-            if font_size <= 0:
-                font_size = 1
-                font = ImageFont.truetype("arial.ttf", size=font_size)
-            
-            # color
+            # Get corner colors for background and text color
             corner_colors = [pixels[x1+1, y1+1], pixels[x2-1, y2+1], pixels[x4+1, y4-1], pixels[x3-1, y3-1]]
-           
-            # Find the average of these colors
             avg_r = int(np.average([color[0] for color in corner_colors]))
             avg_g = int(np.average([color[1] for color in corner_colors]))
             avg_b = int(np.average([color[2] for color in corner_colors]))
 
             brightness = 0.2126 * avg_r + 0.7152 * avg_g + 0.0722 * avg_b
-            text_color = None
-            if brightness >= 128:
-                text_color = (0,0,0)
-            else:
-                text_color = (255, 255, 255)
-            
-            # draw a background rectangle using this color
-            line_draw.rectangle([(0, 0), (width, height)], fill=(avg_r, avg_g, avg_b))
+            text_color = (0, 0, 0) if brightness >= 128 else (255, 255, 255)
 
-            # Display displayed_text on the line canvas
-            line_draw.text((0, 0), displayed_text, font=font, fill=text_color) # TODO: Add color to text, change location of text
-
-            # # Convert the new line canvas to a numpy array
-            # line_array = np.array(line_canvas)
-            
-            # Rotate the line array to match the angle of the rectangle
             # Calculate the angle of rotation
             angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
 
-            line_image = line_canvas.rotate(angle)
-            
-            # # Rotate the line array
-            # line_array = cv.warpAffine(line_array, cv.getRotationMatrix2D((width // 2, height // 2), angle, 1), (width, height))
-            
-            # # Convert the rotated line array back to a PIL Image in integer values
-            # line_image = Image.fromarray(line_array)
+            # If this line needs transformation, apply it
+            if should_transform:
+                # Create a blank canvas for the text
+                line_canvas = Image.new('RGB', (int(math.ceil(text_width)), height), 0)
+                line_draw = ImageDraw.Draw(line_canvas)
+                # Draw background and text
+                line_draw.rectangle([(0, 0), (text_width, height)], fill=(avg_r, avg_g, avg_b))
+                line_draw.text((0, margin_y), words, font=font, fill=text_color)
 
+                if DEBUGGING:
+                    print("Transforming line")
+                    print(text_width)
+                    print(width)
+                    print(words)
+                
+                # Calculate the scale factor needed to fit the text
+                scale_factor = (text_width) / width
+                
+                # Create transformation matrix for horizontal scaling
+                transform_matrix = [
+                    scale_factor, 0, 0, # a, b, c
+                    0, 1, 0             # d, e, f
+                ]
+
+                # The matrix represents the following transformation:
+                # new_x = a*old_x + b*old_y + c
+                # new_y = d*old_x + e*old_y + f
+                
+                # Apply the transformation
+                line_canvas = line_canvas.transform(
+                    (width, height),
+                    Image.AFFINE,
+                    transform_matrix,
+                    fillcolor=(avg_r, avg_g, avg_b),
+                    resample=Image.BICUBIC
+                )
+            else:
+                # Create a blank canvas for the text
+                line_canvas = Image.new('RGB', (width, height), 0)
+                line_draw = ImageDraw.Draw(line_canvas)
+                # Draw background and text
+                line_draw.rectangle([(0, 0), (width, height)], fill=(avg_r, avg_g, avg_b))
+                line_draw.text((0, margin_y), words, font=font, fill=text_color)
+
+
+            # Rotate the line to match the angle of the rectangle
+            line_image = line_canvas.rotate(angle, fillcolor=(avg_r, avg_g, avg_b))
+            
             # Add the line to the image
             Image.Image.paste(pil_image, line_image, (int(x1), int(y1)))
 
             if DEBUGGING:
                 plt.imshow(pil_image)
                 plt.show()
-    
-        # if len(remaining_text) > 0:
-        #     (x1,y2), (x2,y2),_,_ = lines[-1]
-            
-        #     displayed_text = " ".join(remaining_text)
-        #     word_length = int(font.getlength(displayed_text)) + 1
-        #     line_canvas2 = Image.new('RGB', (word_length, height), color=0)
-        #     line_draw2 = ImageDraw.Draw(line_canvas2)
-        #     corner_colors = [pixels[x1+1, y1+1], pixels[x2-1, y2+1], pixels[x4+1, y4-1], pixels[x3-1, y3-1]]
-           
-        #     # Find the average of these colors
-        #     avg_r = int(np.average([color[0] for color in corner_colors]))
-        #     avg_g = int(np.average([color[1] for color in corner_colors]))
-        #     avg_b = int(np.average([color[2] for color in corner_colors]))
-
-        #     brightness = 0.2126 * avg_r + 0.7152 * avg_g + 0.0722 * avg_b
-        #     text_color = None
-        #     if brightness >= 128:
-        #         text_color = (0,0,0)
-        #     else:
-        #         text_color = (255, 255, 255)
-        #     # draw a background rectangle using this color
-        #     line_draw2.rectangle([(0, 0), (word_length, height)], fill=(avg_r, avg_g, avg_b))
-
-        #     # Display displayed_text on the line canvas
-        #     line_draw2.text((0, 0), displayed_text, font=font, fill=text_color) # TODO: Add color to text, change location of text
-
-        #     _, im_width = pil_image.size
-            
-        #     # Convert the new line canvas to a numpy array
-        #     line_array2 = np.array(line_canvas2)
-            
-        #     # Rotate the line array to match the angle of the rectangle
-        #     # Calculate the angle of rotation
-        #     angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
-            
-        #     # Rotate the line array
-        #     line_array2 = cv.warpAffine(line_array2, cv.getRotationMatrix2D((word_length // 2, height // 2), angle, 1), (word_length, height))
-            
-        #     # Convert the rotated line array back to a PIL Image in integer values
-        #     line_image2 = Image.fromarray(line_array2)
-
-        #     # Add the line to the image
-        #     Image.Image.paste(pil_image, line_image2, (int(x2), int(y2)))
-
-
-
-
-
-
-
-    # for pair, text in zip(rectangles, texts):
-    #     rect, lines = pair
-    #     x1, y1, width, height = rect
-
-    #     # Create a blank canvas for the text
-    #     text_canvas = Image.new('RGB', (width, height), 0)
-    #     text_draw = ImageDraw.Draw(text_canvas)
-
-    #     # TODO: Should probably not be needed, now that we aren't running in paragraph=True
-    #     # Width should be max number of characters we want
-    #     # To find max number of characters we can fit its = rect width / font_size width
-    #     # Define a font and its size TODO: Customize font to match the original image style
-       
-    #     font_size = int(np.floor((height / lines)))
-    #     print(font_size)
-    #     print(width)
-    #     font = ImageFont.truetype("arial.ttf", size=font_size)
-    #     lines = textwrap.wrap(text, width=int(width//))
-    #     lines = '\n'.join(lines)
-    #     print(lines)
-
-    #     # Get the x and y coordinates of the top left corner of the box
-    #     x, y, w, h = rect
-    #     # Get the RGB values at the corners of the box - one pixel in
-    #     corner_colors = [pixels[x+1, y+1], pixels[x+w-1, y+1], pixels[x+1, y+h-1], pixels[x+w-1, y+h-1]]
-    #     print(corner_colors)
-    #     # Find the average of these colors
-    #     avg_r = int(np.average([color[0] for color in corner_colors]))
-    #     avg_g = int(np.average([color[1] for color in corner_colors]))
-    #     avg_b = int(np.average([color[2] for color in corner_colors]))
-    #     print(avg_r, avg_g, avg_b)
-
-    #     # draw a background rectangle using this color
-    #     text_draw.rectangle([(0, 0), (w, h)], fill=(avg_r, avg_g, avg_b))
-    #     text_draw.multiline_text((0, 0), lines, font=font, fill=0)
-
-    #     # Convert the text canvas to a numpy array
-    #     text_array = np.array(text_canvas)
-
-    #     ## Calculate transformation matrix for rotation and scaling
-    #     # Find corners in the original image to map to the corners of the text canvas
-    #     #dst = cv.cornerHarris(gray,2,3,0.04)
-
-    #     # Resize the text array to fit the rectangltext_draw.textlength(text[0], font=font)e
-    #     #text_array_resized = Image.fromarray(text_array).resize((width, height))
-    #     Image.Image.paste(pil_image, Image.fromarray(text_array), (x1, y1))
 
     return np.asarray(pil_image)
 
+def bucketize_text_by_length(words, line_lengths, word_lengths, space_length):
+    """
+    Bucket the text by length, trying to fit as many words as possible into each line
+
+    words: List of words to be bucketed
+    line_lengths: List of lengths of the bounding box lines
+    word_lengths: List of precalculated lengths of the words
+    space_length: Length of the space character
+    """
+    n = len(words)
+    
+    words_grouped_by_line = []
+    words_index = 0
+    for line_length in line_lengths:
+        line_words = []
+        current_len = 0
+
+        # Keep adding words while there's space on the line and words remaining
+        while words_index < n and current_len < line_length:
+            next_word_total_len = word_lengths[words_index]
+            if line_words:  # Add space length if not first word
+                next_word_total_len += space_length
+                
+            # Check if adding next word would exceed line length
+            if current_len + next_word_total_len > line_length:
+                break
+                
+            # Add the word and update current length
+            if line_words:
+                current_len += space_length
+            current_len += word_lengths[words_index]
+            line_words.append(words[words_index])
+            words_index += 1
+
+        # Add the line of words to our grouping
+        words_grouped_by_line.append(" ".join(line_words))
+        
+        # If we've used all words, stop processing more lines
+        if words_index >= n:
+            break
+            
+    # Handle any remaining lines by adding empty strings
+    while len(words_grouped_by_line) < len(line_lengths):
+        words_grouped_by_line.append("")
+        
+    return words_grouped_by_line
 
 def bucketize_text_almost_evenly(words, num_lines):
+    
 
     n = len(words)
 

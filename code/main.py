@@ -64,8 +64,6 @@ def process_image(image_path, from_lang, to_lang):
 
     # Code to project text back onto the image
     altered_image = project_text_onto_image(image, translated_texts, cluster_rectangles)
-    if DEBUGGING:
-        print("projected image done")
 
     # Apply inverse of the rotation matrix to the image to recorrect for skew
     if rotation_matrix is not None:
@@ -82,12 +80,15 @@ def process_image(image_path, from_lang, to_lang):
                                      borderValue=(255,255,255))
 
     output_filepath = os.path.join('outputs', image_path)
-    img = Image.fromarray(altered_image, 'RGB')
+    # altered_image is RGBA, so we drop the alpha channel when saving
+    img = Image.fromarray(altered_image[...,:3].astype('uint8'), 'RGB') 
+    
     img.save(output_filepath)
 
-    
-    plt.imshow(altered_image)
-    plt.show()
+    if DEBUGGING:
+        plt.imshow(altered_image)
+        plt.title(f"Final Result: {output_filepath}")
+        plt.show()
 
     return output_filepath
 
