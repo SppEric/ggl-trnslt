@@ -4,74 +4,26 @@
 Packages to pip install
 - translate
 - opencv-python
-- pytesseract
+- easyocr
 - scikit-learn
 
 
-## TODO:
-- Address Skew Issues
+## Running the Code
 
-Do the OCR Library Call to detect amount of rotation required to fix image, and save it
+There are two ways to run the code. The first way is running the code directly from the terminal. When doing this, make sure to set the DEBUGGING flag to True on all files, to ensure that the output images are shown. This shows a more intermediate product of the project. To run via the terminal, use the command
 
-    1 -  figure out if image is skewed
-        a - if it is, unskew the image
-    2 - continue the process as normal
-    3 - use the inital rotation/skew
+```
+python main.py --image_path --from_lang --to_lang
+```
+from the code directory.
 
-- Figure out how to approach matching text in boxes
+The second way, which demonastrates the full finished product of the project, involves a locally-hosted website which can be launched using the terminal command 
+```
+python app.py
+```
+from the code directory. This will launch a Flask app with a UI to submit images and see the results.
 
-Taking safe estimate of what the box is for now
+Additionally, we have setup a pipeline to download images locally so that they can be given to the model in `form.py`. This requires setting up a Google Drive folder for the images to be put in and Google authetication for that account.
 
-
-## Approach:
-
-### 1 - OCR:
-`function image_processing():` 
-`inputs:` Takes in an image path (TODO: Modify so can be from live video?)  
-
-#### Steps:
-Read in image  
-Detect and fix visual anomalies (e.g. skew)  
-Get bounding boxes for text (initially around each word)  
-Get text itself  
-
-`returns:` the image, the text, the skew, and the bounding boxes
-
-
-### 2 - Translation:
-`function translate_text():`  
-`inputs:` text, from_language, to_language 
-
-#### Steps:
-Translate text, assuming it's in from_language and output in to_language  
-
-`returns:` translated text
-
-### 3 - Projection:
-`function project_text()`  
-`inputs:` image, translated text, skew, bounding boxes  
-
-#### Steps:
-- Remove text by filling in bounding boxes with the detected background color of each bounding box  
-- Calculate the overall bounding box our text will live in  
-- Put text back in (elaborate)
-- Reskew the image to be like the original
-
-`returns:` image with projected text! YAYAYAY
-
-
-
-
-
-LINKS:
-
-Preprocessing image and skew:
-https://stackoverflow.com/questions/57964634/python-opencv-skew-correction-for-ocr
-https://pyimagesearch.com/2022/01/31/correcting-text-orientation-with-tesseract-and-python/
-https://pyimagesearch.com/2017/02/20/text-skew-correction-opencv-python/
-https://gpttutorpro.com/ocr-integration-for-nlp-applications-preprocessing-images-for-ocr/
-
-Putting text on image:
-https://www.geeksforgeeks.org/adding-text-on-image-using-python-pil/
-
-cv.inpaint for filling in/removing the text
+### Note
+As is, this code cannot be run on Apple computers. The fontbook for Apple and Windows computers is different, and so the code will error for Mac users due to the incompatible font.
