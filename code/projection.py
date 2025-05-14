@@ -206,10 +206,6 @@ def project_text_onto_image(image, texts, clusters):
                     scale_factor, 0, 0, # a, b, c
                     0, 1, 0             # d, e, f
                 ]
-
-                # The matrix represents the following transformation:
-                # new_x = a*old_x + b*old_y + c
-                # new_y = d*old_x + e*old_y + f
                 
                 # Apply the transformation
                 line_canvas = line_canvas.transform(
